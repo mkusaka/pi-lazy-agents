@@ -98,7 +98,7 @@ API references: pi's `extensions.md`, `message-types.md`, `codemode.md`, `cli.md
 ## Release
 
 1. Run the checks above and `npm pack --dry-run`. In a local checkout, temporarily
-   set `version` in `package.json` to `0.0.0-stage` and manually run
+   set `version` in `package.json` to `0.0.1-stage.0` and manually run
    `npm publish --tag stage` from an authenticated terminal. Restore `0.0.1`.
 2. On npmjs.com, configure a GitHub Actions trusted publisher with owner `mkusaka`,
    repository `pi-lazy-agents`, and workflow filename `publish.yml`. Allow direct
