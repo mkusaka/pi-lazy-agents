@@ -23,18 +23,58 @@ test("one hidden request-local custom message follows intact tool pairs and pres
   registry.root = root;
   for (const directory of ["src/deep", "tests", "src"]) {
     const path = join(root, directory, "AGENTS.md");
-    registry.instructions.set(path, { path, directory: join(root, directory), content: `Rules for ${directory}`, mtimeMs: 1, size: 1 });
+    registry.instructions.set(path, {
+      path,
+      directory: join(root, directory),
+      content: `Rules for ${directory}`,
+      mtimeMs: 1,
+      size: 1,
+    });
   }
   const messages = [
     { role: "system", content: "unchanged system prompt", timestamp: 1 },
     { role: "user", content: "read two files", timestamp: 2 },
-    { role: "assistant", content: [
-      { type: "toolCall", id: "a", name: "read", arguments: { path: "src/x.ts" } },
-      { type: "toolCall", id: "b", name: "read", arguments: { path: "tests/x.ts" } },
-    ], timestamp: 3 },
-    { role: "toolResult", toolCallId: "b", toolName: "read", content: [{ type: "text", text: "second file" }], isError: false, timestamp: 4 },
-    { role: "toolResult", toolCallId: "a", toolName: "read", content: [{ type: "text", text: "first file" }], isError: false, timestamp: 5 },
-    { role: "custom", customType: "another-extension", content: "keep me", display: false, timestamp: 6 },
+    {
+      role: "assistant",
+      content: [
+        {
+          type: "toolCall",
+          id: "a",
+          name: "read",
+          arguments: { path: "src/x.ts" },
+        },
+        {
+          type: "toolCall",
+          id: "b",
+          name: "read",
+          arguments: { path: "tests/x.ts" },
+        },
+      ],
+      timestamp: 3,
+    },
+    {
+      role: "toolResult",
+      toolCallId: "b",
+      toolName: "read",
+      content: [{ type: "text", text: "second file" }],
+      isError: false,
+      timestamp: 4,
+    },
+    {
+      role: "toolResult",
+      toolCallId: "a",
+      toolName: "read",
+      content: [{ type: "text", text: "first file" }],
+      isError: false,
+      timestamp: 5,
+    },
+    {
+      role: "custom",
+      customType: "another-extension",
+      content: "keep me",
+      display: false,
+      timestamp: 6,
+    },
   ] as AgentMessage[];
   const snapshot = structuredClone(messages);
   const result = inject(messages, registry);
@@ -47,7 +87,10 @@ test("one hidden request-local custom message follows intact tool pairs and pres
   const text = String(reminder?.content);
   assert.ok(text.includes('scope="src/**"'));
   assert.ok(text.includes('scope="tests/**"'));
-  assert.ok(text.indexOf('path="src/AGENTS.md"') < text.indexOf('path="src/deep/AGENTS.md"'));
+  assert.ok(
+    text.indexOf('path="src/AGENTS.md"') <
+      text.indexOf('path="src/deep/AGENTS.md"'),
+  );
   assert.ok(!text.includes(root));
   assert.equal(inject(result, registry).length, result.length);
   registry.instructions.clear();
@@ -60,11 +103,24 @@ test("context rebuilds use current content, escape path attributes, and survive 
   const registry = new Registry();
   registry.root = root;
   const path = join(root, 'src&"/AGENTS.md');
-  const instruction = { path, directory: join(root, 'src&"'), content: "old rules", mtimeMs: 1, size: 1 };
+  const instruction = {
+    path,
+    directory: join(root, 'src&"'),
+    content: "old rules",
+    mtimeMs: 1,
+    size: 1,
+  };
   registry.instructions.set(path, instruction);
   const first = inject([], registry);
   instruction.content = "new rules";
-  const compacted = [{ role: "compactionSummary", summary: "older history", tokensBefore: 100, timestamp: 1 }] as AgentMessage[];
+  const compacted = [
+    {
+      role: "compactionSummary",
+      summary: "older history",
+      tokensBefore: 100,
+      timestamp: 1,
+    },
+  ] as AgentMessage[];
   const next = inject(compacted, registry);
   assert.ok(reminderText(first).includes("old rules"));
   assert.ok(reminderText(next).includes("new rules"));

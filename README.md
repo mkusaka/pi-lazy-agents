@@ -14,7 +14,7 @@ pi -e ./index.ts
 ```
 
 For persistent package installation, run `pi install .` from this directory.
-The package manifest exposes only `index.ts`.
+The package manifest declares `index.ts` as the extension entry point.
 
 ```text
 project/
@@ -61,14 +61,29 @@ restart, session replacement, or extension reload. History is not replayed on
 caching cannot detect same-size edits with unchanged mtime. There is no total
 instruction-token budget and no support for other instruction filenames.
 
-## Verify
+## Development
+
+Use Bun 1.4.4 and Node.js 24+:
 
 ```sh
-npm test
+bun install
+bun check # or bun run typecheck
+bun fmt
+bun fmt --check
+bun run lint
+bun run test
 ```
 
+Keep `bun.lock` in version control. `bunfig.toml` requires newly resolved packages
+to be at least seven days old. Checking and formatting use Bun's built-ins; the
+`fmt` script uses `--no-script` to avoid recursion. Oxlint uses its default rules.
+Pi 1.3.0 and Node.js types are development-only dependencies for type checking;
+pi remains an optional peer dependency. `skipLibCheck` skips incompatible upstream
+declaration files, while project source and tests are checked in strict mode with
+only erasable TypeScript syntax.
+
 Tests use Node's native TypeScript stripping and temporary runtime fixtures, with
-no development dependencies. They cover discovery, caching, hooks, parallel/nested
+no additional test runner. They cover discovery, caching, hooks, parallel/nested
 calls, context ordering, lifecycle, and security failures.
 
 Real-pi smoke tests verified direct and nested codemode reads, canary compliance
@@ -79,3 +94,20 @@ after results; live provider verification was limited to OpenAI.
 
 API references: pi's `extensions.md`, `message-types.md`, `codemode.md`, `cli.md`,
 `packages.md`, `compaction.md`, `session-format.md`, and `configuration.md`.
+
+## Release
+
+1. Run the checks above and `npm pack --dry-run`. In a local checkout, temporarily
+   set `version` in `package.json` to `0.0.0-stage` and manually run
+   `npm publish --tag stage` from an authenticated terminal. Restore `0.0.1`.
+2. On npmjs.com, configure a GitHub Actions trusted publisher with owner `mkusaka`,
+   repository `pi-lazy-agents`, and workflow filename `publish.yml`. Allow direct
+   `npm publish`.
+3. Push tag `v0.0.1` for the reviewed release commit. For later releases, bump the
+   version, run `bun install` and the checks above, and push the matching `vX.Y.Z` tag.
+
+The placeholder lets npm create the package before
+[trusted publishing is configured](https://docs.npmjs.com/cli/v11/commands/npm-trust/#prerequisites).
+The workflow checks the tag, skips versions already on npm, and uses Node 24's
+bundled npm for token-free OIDC publishing with automatic provenance from a public
+repository. Complete the first trusted publish within two days of configuration.

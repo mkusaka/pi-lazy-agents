@@ -5,22 +5,41 @@ import type { Registry } from "./registry.ts";
 const customType = "pi-lazy-agents.directory-instructions";
 
 function attribute(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
-  })[character]!);
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&apos;",
+      })[character]!,
+  );
 }
 
-export function inject(messages: ContextEvent["messages"], registry: Registry): ContextEvent["messages"] {
-  const result = messages.filter((message) => message.role !== "custom" || message.customType !== customType);
+export function inject(
+  messages: ContextEvent["messages"],
+  registry: Registry,
+): ContextEvent["messages"] {
+  const result = messages.filter(
+    (message) => message.role !== "custom" || message.customType !== customType,
+  );
   if (registry.instructions.size === 0) return result;
   const instructions = [...registry.instructions.values()].sort((a, b) => {
     const left = projectPath(registry.root, a.directory);
     const right = projectPath(registry.root, b.directory);
-    return left.split("/").length - right.split("/").length || left.localeCompare(right) || a.path.localeCompare(b.path);
+    return (
+      left.split("/").length - right.split("/").length ||
+      left.localeCompare(right) ||
+      a.path.localeCompare(b.path)
+    );
   });
   const sections = instructions.map((instruction) => {
     const path = attribute(projectPath(registry.root, instruction.path));
-    const scope = attribute(`${projectPath(registry.root, instruction.directory)}/**`);
+    const scope = attribute(
+      `${projectPath(registry.root, instruction.directory)}/**`,
+    );
     return `<instruction path="${path}" scope="${scope}">\n${instruction.content}\n</instruction>`;
   });
   result.push({

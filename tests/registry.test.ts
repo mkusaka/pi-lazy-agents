@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, realpath, rm, unlink, utimes, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  realpath,
+  rm,
+  unlink,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -17,7 +25,12 @@ test("registry deduplicates, refreshes by mtime/size, invalidates deletions, and
   }
   const registry = new Registry();
   const access = async (scope: string) => {
-    const result = await discover(root, `${scope}/x.ts`, false, registry.instructions);
+    const result = await discover(
+      root,
+      `${scope}/x.ts`,
+      false,
+      registry.instructions,
+    );
     assert.ok(result);
     registry.apply(result);
   };
@@ -25,7 +38,10 @@ test("registry deduplicates, refreshes by mtime/size, invalidates deletions, and
   const original = registry.instructions.get(join(root, "src/AGENTS.md"));
   await access("src");
   assert.equal(registry.instructions.size, 1);
-  assert.deepEqual(registry.instructions.get(join(root, "src/AGENTS.md")), original);
+  assert.deepEqual(
+    registry.instructions.get(join(root, "src/AGENTS.md")),
+    original,
+  );
   assert.equal(registry.visitedFiles.size, 1);
   await access("tests");
   assert.equal(registry.instructions.size, 2);
@@ -33,10 +49,16 @@ test("registry deduplicates, refreshes by mtime/size, invalidates deletions, and
   const future = new Date(Date.now() + 10000);
   await utimes(join(root, "src/AGENTS.md"), future, future);
   await access("src");
-  assert.equal(registry.instructions.get(join(root, "src/AGENTS.md"))?.content, "new");
+  assert.equal(
+    registry.instructions.get(join(root, "src/AGENTS.md"))?.content,
+    "new",
+  );
   await writeFile(join(root, "src/AGENTS.md"), "longer instructions");
   await access("src");
-  assert.equal(registry.instructions.get(join(root, "src/AGENTS.md"))?.content, "longer instructions");
+  assert.equal(
+    registry.instructions.get(join(root, "src/AGENTS.md"))?.content,
+    "longer instructions",
+  );
   await unlink(join(root, "src/AGENTS.md"));
   await access("src");
   assert.equal(registry.instructions.size, 1);

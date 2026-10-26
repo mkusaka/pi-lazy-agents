@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, mkdir, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  mkdir,
+  realpath,
+  rm,
+  symlink,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -13,7 +22,8 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   const base = await realpath(temporary);
   const root = join(base, "project");
   const outside = join(base, "outside");
-  for (const directory of [root, outside, join(root, "sub")]) await mkdir(directory);
+  for (const directory of [root, outside, join(root, "sub")])
+    await mkdir(directory);
   await writeFile(join(root, "sub/x.ts"), "export {};");
   await writeFile(join(outside, "x.ts"), "export {};");
   return { root, outside };
@@ -27,14 +37,25 @@ test("realpath rejects escaping file, directory, instruction, and dangling symli
   await symlink(join(outside, "x.ts"), join(root, "sub/escape.ts"));
   await symlink(join(outside, "AGENTS.md"), join(root, "sub/AGENTS.md"));
   await symlink(join(outside, "missing"), join(root, "dangling"));
-  for (const path of ["linked/x.ts", "linked/new/file.ts", "sub/escape.ts", "dangling/new.ts"]) {
+  for (const path of [
+    "linked/x.ts",
+    "linked/new/file.ts",
+    "sub/escape.ts",
+    "dangling/new.ts",
+  ]) {
     assert.equal(await discover(root, path, true, new Map()), undefined);
   }
-  assert.equal((await discover(root, "sub/x.ts", false, new Map()))?.instructions.length, 0);
+  assert.equal(
+    (await discover(root, "sub/x.ts", false, new Map()))?.instructions.length,
+    0,
+  );
   await unlink(join(root, "sub/AGENTS.md"));
   await writeFile(join(root, "AGENTS.md"), "ROOT-INSTRUCTION-CANARY");
   await symlink(join(root, "AGENTS.md"), join(root, "sub/AGENTS.md"));
-  assert.equal((await discover(root, "sub/x.ts", false, new Map()))?.instructions.length, 0);
+  assert.equal(
+    (await discover(root, "sub/x.ts", false, new Map()))?.instructions.length,
+    0,
+  );
   await unlink(join(root, "sub/AGENTS.md"));
   await writeFile(join(root, "sub/AGENTS.md"), "inside rules");
   await symlink(join(root, "sub"), join(root, "alias"), "dir");
@@ -51,20 +72,39 @@ test("size limits and fatal UTF-8 decoding reject entire files with content-free
   const { root } = await fixture(t);
   const warnings: string[] = [];
   for (const method of ["log", "info", "debug", "error"] as const) {
-    t.mock.method(console, method, () => assert.fail("Unexpected console output"));
+    t.mock.method(console, method, () =>
+      assert.fail("Unexpected console output"),
+    );
   }
-  t.mock.method(console, "warn", (...args: unknown[]) => warnings.push(args.join(" ")));
+  t.mock.method(console, "warn", (...args: unknown[]) =>
+    warnings.push(args.join(" ")),
+  );
   const canary = "PRIVATE-INSTRUCTION-CANARY";
   const file = join(root, "sub/AGENTS.md");
   await writeFile(file, canary + "x".repeat(config.maxFileSizeBytes));
-  assert.equal((await discover(root, "sub/x.ts", false, new Map()))?.instructions.length, 0);
-  await writeFile(file, Buffer.concat([Buffer.from(canary), Buffer.from([0xc3, 0x28])]));
-  assert.equal((await discover(root, "sub/x.ts", false, new Map()))?.instructions.length, 0);
+  assert.equal(
+    (await discover(root, "sub/x.ts", false, new Map()))?.instructions.length,
+    0,
+  );
+  await writeFile(
+    file,
+    Buffer.concat([Buffer.from(canary), Buffer.from([0xc3, 0x28])]),
+  );
+  assert.equal(
+    (await discover(root, "sub/x.ts", false, new Map()))?.instructions.length,
+    0,
+  );
   await writeFile(file, "x".repeat(config.maxFileSizeBytes));
-  assert.equal((await discover(root, "sub/x.ts", false, new Map()))?.instructions[0].size, config.maxFileSizeBytes);
+  assert.equal(
+    (await discover(root, "sub/x.ts", false, new Map()))?.instructions[0].size,
+    config.maxFileSizeBytes,
+  );
   await unlink(file);
   await mkdir(file);
-  assert.equal((await discover(root, "sub/x.ts", false, new Map()))?.instructions.length, 0);
+  assert.equal(
+    (await discover(root, "sub/x.ts", false, new Map()))?.instructions.length,
+    0,
+  );
   assert.deepEqual(warnings, [
     "[lazy-agents] Skipped instructions (too-large).",
     "[lazy-agents] Skipped instructions (invalid-utf8).",
@@ -75,14 +115,22 @@ test("size limits and fatal UTF-8 decoding reject entire files with content-free
 });
 
 test("permission errors skip instructions without logging contents or filesystem errors", async (t) => {
-  if (process.getuid?.() === 0 || process.platform === "win32") return t.skip("Requires POSIX file permissions and a non-root process");
+  if (process.getuid?.() === 0 || process.platform === "win32")
+    return t.skip("Requires POSIX file permissions and a non-root process");
   const { root } = await fixture(t);
   const file = join(root, "sub/AGENTS.md");
   const warnings: string[] = [];
-  t.mock.method(console, "warn", (...args: unknown[]) => warnings.push(args.join(" ")));
+  t.mock.method(console, "warn", (...args: unknown[]) =>
+    warnings.push(args.join(" ")),
+  );
   await writeFile(file, "PRIVATE-PERMISSION-CANARY");
   await chmod(file, 0);
   t.after(() => chmod(file, 0o600).catch(() => {}));
-  assert.equal((await discover(root, "sub/x.ts", false, new Map()))?.instructions.length, 0);
-  assert.deepEqual(warnings, ["[lazy-agents] Skipped instructions (unreadable)."]);
+  assert.equal(
+    (await discover(root, "sub/x.ts", false, new Map()))?.instructions.length,
+    0,
+  );
+  assert.deepEqual(warnings, [
+    "[lazy-agents] Skipped instructions (unreadable).",
+  ]);
 });

@@ -26,8 +26,12 @@ export async function discover(
     try {
       const path = await realpath(join(directory, "AGENTS.md"));
       // Never read outside the boundary or reload a root context file via an alias.
-      if (!isWithin(target.root, path) || dirname(path) === target.root) continue;
-      const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      if (!isWithin(target.root, path) || dirname(path) === target.root)
+        continue;
+      const handle = await open(
+        path,
+        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+      );
       try {
         const metadata = await handle.stat();
         if (!metadata.isFile()) {
@@ -39,7 +43,11 @@ export async function discover(
           continue;
         }
         const previous = cached.get(path);
-        if (previous && previous.mtimeMs === metadata.mtimeMs && previous.size === metadata.size) {
+        if (
+          previous &&
+          previous.mtimeMs === metadata.mtimeMs &&
+          previous.size === metadata.size
+        ) {
           instructions.push({ ...previous, directory });
           continue;
         }
@@ -47,7 +55,12 @@ export async function discover(
         const buffer = Buffer.alloc(config.maxFileSizeBytes + 1);
         let size = 0;
         while (size < buffer.length) {
-          const { bytesRead } = await handle.read(buffer, size, buffer.length - size, null);
+          const { bytesRead } = await handle.read(
+            buffer,
+            size,
+            buffer.length - size,
+            null,
+          );
           if (bytesRead === 0) break;
           size += bytesRead;
         }
@@ -57,12 +70,20 @@ export async function discover(
         }
         let content: string;
         try {
-          content = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, size));
+          content = new TextDecoder("utf-8", { fatal: true }).decode(
+            buffer.subarray(0, size),
+          );
         } catch {
           console.warn("[lazy-agents] Skipped instructions (invalid-utf8).");
           continue;
         }
-        instructions.push({ path, directory, content: content.replace(/\r\n?/g, "\n"), mtimeMs: metadata.mtimeMs, size });
+        instructions.push({
+          path,
+          directory,
+          content: content.replace(/\r\n?/g, "\n"),
+          mtimeMs: metadata.mtimeMs,
+          size,
+        });
       } finally {
         await handle.close();
       }

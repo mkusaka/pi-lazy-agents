@@ -17,7 +17,8 @@ export class Registry {
     this.root = discovery.root;
     const directories = new Set(discovery.directories);
     for (const [path, instruction] of this.instructions) {
-      if (directories.has(instruction.directory)) this.instructions.delete(path);
+      if (directories.has(instruction.directory))
+        this.instructions.delete(path);
     }
     for (const instruction of discovery.instructions) {
       this.instructions.set(instruction.path, instruction);
