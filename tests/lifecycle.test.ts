@@ -28,7 +28,14 @@ function runtime(cwd: string) {
   );
   lazyAgents(pi as unknown as ExtensionAPI);
   const emit = (type: string, fields = {}) =>
-    handlers.get(type)?.({ type, ...fields }, { cwd, ui: forbidden });
+    handlers.get(type)?.(
+      { type, ...fields },
+      {
+        cwd,
+        ui: forbidden,
+        isProjectTrusted: () => true,
+      },
+    );
   const call = (id: string, toolName = "read", path = "sub/x.ts", extra = {}) =>
     emit("tool_call", { toolCallId: id, toolName, input: { path }, ...extra });
   const result = (id: string, isError = false, toolName = "read", extra = {}) =>

@@ -29,6 +29,7 @@ export default function lazyAgents(pi: ExtensionAPI) {
         path,
         event.toolName !== "read",
         current.instructions,
+        ctx.isProjectTrusted(),
       );
       // A session replacement may complete while discovery is awaiting the filesystem.
       if (!discovery || current !== registry) return;

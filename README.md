@@ -1,20 +1,27 @@
 # pi-lazy-agents
 
 A minimal pi extension that lazily loads `AGENTS.md` files **strictly below cwd**
-when `read`, `edit`, or `write` accesses a file in their scope. Pi continues to
-load cwd and ancestor context files itself.
+when `read`, `edit`, or `write` accesses a file in their scope, along with skills
+from `.agents/skills` in those same descendant directories. Pi continues to load
+cwd and ancestor context files and `.agents/skills` itself.
 
-## Use
-
-Requires Node.js 24+ for tests. Verified against pi 1.4.0. No build step or runtime
-dependencies are needed; pi supplies the extension API.
+## Install
 
 ```sh
-pi -e ./index.ts
+pi install npm:pi-lazy-agents
 ```
 
-For persistent package installation, run `pi install .` from this directory.
-The package manifest declares `index.ts` as the extension entry point.
+Add `-l` to write the declaration to the project's `.pi/settings.json` instead of
+`~/.pi/agent/settings.json`. To try it for one invocation without installing:
+
+```sh
+pi -e npm:pi-lazy-agents
+```
+
+Verified against pi 1.4.0. No build step or runtime dependencies; pi supplies the
+extension API.
+
+## How it works
 
 ```text
 project/
@@ -28,6 +35,13 @@ Reading `src/components/button.ts` discovers the two descendant instruction file
 parent first. The next model request receives one hidden, request-local custom
 message with relative paths, explicit `src/**` and `src/components/**` scopes, and
 more-specific-directory precedence. The system prompt and tool results are unchanged.
+
+`src/.agents/skills` is discovered the same way. As with pi's own skill list, only
+each skill's name, description, and cwd-relative `SKILL.md` location are injected;
+the model reads the body when a task matches. `disable-model-invocation` skills are
+not listed. Skills load only when `ctx.isProjectTrusted()` is true. Pi's trust
+prompt checks only cwd and ancestors, so a project whose only skills are nested is
+auto-trusted and its skills load without a prompt.
 
 ## Behavior and safety
 
@@ -61,6 +75,13 @@ restart, session replacement, or extension reload. History is not replayed on
 caching cannot detect same-size edits with unchanged mtime. There is no total
 instruction-token budget and no support for other instruction filenames.
 
+Lazily discovered skills are listed for the model only: they are not registered
+as `/skill:name` commands, and name collisions with pi-loaded skills or with each
+other are not deduplicated. Root-level `.md` files in `.agents/skills` are ignored
+as in pi, but nested `.md` files outside a `SKILL.md` directory are not loaded. Skill directories
+are rescanned on every eligible access without a size limit; skill files that
+resolve outside cwd are dropped.
+
 ## Development
 
 Use Bun 1.4.4 and Node.js 24+:
@@ -73,6 +94,8 @@ bun fmt --check
 bun run lint
 bun run test
 ```
+
+Load the checkout in pi with `pi -e ./index.ts`.
 
 Keep `bun.lock` in version control. `bunfig.toml` requires newly resolved packages
 to be at least seven days old. Checking and formatting use Bun's built-ins; the
@@ -97,17 +120,12 @@ API references: pi's `extensions.md`, `message-types.md`, `codemode.md`, `cli.md
 
 ## Release
 
-1. Run the checks above and `npm pack --dry-run`. In a local checkout, temporarily
-   set `version` in `package.json` to `0.0.1-stage.0` and manually run
-   `npm publish --tag stage` from an authenticated terminal. Restore `0.0.1`.
-2. On npmjs.com, configure a GitHub Actions trusted publisher with owner `mkusaka`,
-   repository `pi-lazy-agents`, and workflow filename `publish.yml`. Allow direct
-   `npm publish`.
-3. Push tag `v0.0.1` for the reviewed release commit. For later releases, bump the
-   version, run `bun install` and the checks above, and push the matching `vX.Y.Z` tag.
+Publishing runs from `.github/workflows/publish.yml` with npm trusted publishing
+(OIDC, no token, automatic provenance). To release:
 
-The placeholder lets npm create the package before
-[trusted publishing is configured](https://docs.npmjs.com/cli/v11/commands/npm-trust/#prerequisites).
-The workflow checks the tag, skips versions already on npm, and uses Node 24's
-bundled npm for token-free OIDC publishing with automatic provenance from a public
-repository. Complete the first trusted publish within two days of configuration.
+1. Bump `version` in `package.json`, run `bun install` and the checks above, and
+   commit.
+2. Push the matching `vX.Y.Z` tag.
+
+The workflow reruns the checks, verifies that the tag matches `package.json`, and
+skips versions already on npm.
