@@ -4,6 +4,6 @@ export const config = {
   boundary: "cwd",
   maxFileSizeBytes: 65536,
   refreshOnAccess: true,
-  injectMode: "context",
+  injectMode: "tool_result",
   persistRegistry: false,
 } as const;

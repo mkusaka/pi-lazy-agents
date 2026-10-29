@@ -1,9 +1,6 @@
 import { formatSkillsForPrompt } from "@earendil-works/pi-coding-agent";
-import type { ContextEvent } from "@earendil-works/pi-coding-agent";
 import { projectPath } from "./path.ts";
 import type { Registry } from "./registry.ts";
-
-const customType = "pi-lazy-agents.directory-instructions";
 
 function attribute(value: string): string {
   return value.replace(
@@ -19,24 +16,29 @@ function attribute(value: string): string {
   );
 }
 
-export function inject(
-  messages: ContextEvent["messages"],
+// Renders registry entries not yet in `sent` and records them there.
+export function reminder(
   registry: Registry,
-): ContextEvent["messages"] {
-  const result = messages.filter(
-    (message) => message.role !== "custom" || message.customType !== customType,
-  );
+  sent: Set<string>,
+): string | undefined {
   const depth = (directory: string) =>
     projectPath(registry.root, directory).split("/").length;
-  const instructions = [...registry.instructions.values()].sort((a, b) => {
-    const left = projectPath(registry.root, a.directory);
-    const right = projectPath(registry.root, b.directory);
-    return (
-      left.split("/").length - right.split("/").length ||
-      left.localeCompare(right) ||
-      a.path.localeCompare(b.path)
-    );
-  });
+  const instructions = [...registry.instructions.values()]
+    .filter((instruction) => {
+      const key = `${instruction.path}\0${instruction.mtimeMs}\0${instruction.size}`;
+      if (sent.has(key)) return false;
+      sent.add(key);
+      return true;
+    })
+    .sort((a, b) => {
+      const left = projectPath(registry.root, a.directory);
+      const right = projectPath(registry.root, b.directory);
+      return (
+        left.split("/").length - right.split("/").length ||
+        left.localeCompare(right) ||
+        a.path.localeCompare(b.path)
+      );
+    });
   const sections = instructions.map((instruction) => {
     const path = attribute(projectPath(registry.root, instruction.path));
     const scope = attribute(
@@ -49,12 +51,17 @@ export function inject(
     [...registry.skills.entries()]
       .sort(([a], [b]) => depth(a) - depth(b) || a.localeCompare(b))
       .flatMap(([, skills]) => skills)
+      .filter((skill) => {
+        if (sent.has(skill.filePath)) return false;
+        sent.add(skill.filePath);
+        return true;
+      })
       .map((skill) => ({
         ...skill,
         filePath: projectPath(registry.root, skill.filePath),
       })),
   ).trim();
-  if (sections.length === 0 && !skills) return result;
+  if (sections.length === 0 && !skills) return;
   const parts: string[] = [];
   if (sections.length > 0)
     parts.push(`The following project instructions were loaded from directories accessed during this session.
@@ -67,14 +74,7 @@ More specific directory instructions take precedence within their scope.`);
     parts.push(
       `The following project skills were loaded from .agents/skills directories accessed during this session.\n${skills}`,
     );
-  result.push({
-    role: "custom",
-    customType,
-    display: false,
-    timestamp: Date.now(),
-    content: `<system-reminder type="directory-instructions">
+  return `<system-reminder type="directory-instructions">
 ${parts.join("\n\n")}
-</system-reminder>`,
-  });
-  return result;
+</system-reminder>`;
 }

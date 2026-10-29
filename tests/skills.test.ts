@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { discover } from "../discovery.ts";
-import { inject } from "../injection.ts";
+import { reminder } from "../injection.ts";
 import { Registry } from "../registry.ts";
 
 const skill = (name: string, extra = "") =>
@@ -42,9 +42,7 @@ test("descendant .agents/skills follow pi's trust and layout rules and inject de
   );
   const registry = new Registry();
   registry.apply(result!);
-  const reminder = inject([], registry).at(-1);
-  assert.ok(reminder?.role === "custom");
-  const text = String(reminder.content);
+  const text = reminder(registry, new Set())!;
   assert.match(text, /<name>nested<\/name>/);
   assert.match(
     text,
@@ -57,5 +55,5 @@ test("descendant .agents/skills follow pi's trust and layout rules and inject de
 
   await rm(join(root, "src/.agents"), { recursive: true });
   registry.apply((await discover(root, "src/x.ts", false, new Map(), true))!);
-  assert.deepEqual(inject([], registry), []);
+  assert.equal(reminder(registry, new Set()), undefined);
 });

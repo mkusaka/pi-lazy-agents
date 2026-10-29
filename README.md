@@ -32,9 +32,11 @@ project/
 ```
 
 Reading `src/components/button.ts` discovers the two descendant instruction files,
-parent first. The next model request receives one hidden, request-local custom
-message with relative paths, explicit `src/**` and `src/components/**` scopes, and
-more-specific-directory precedence. The system prompt and tool results are unchanged.
+parent first. Their text is appended once to the end of that tool result, with
+relative paths, explicit `src/**` and `src/components/**` scopes, and
+more-specific-directory precedence. Because the reminder is part of the persisted
+tool result, the conversation prefix stays stable and the provider prompt cache keeps
+growing. The system prompt is unchanged.
 
 `src/.agents/skills` is discovered the same way. As with pi's own skill list, only
 each skill's name, description, and cwd-relative `SKILL.md` location are injected;
@@ -55,23 +57,27 @@ auto-trusted and its skills load without a prompt.
   instructions are removed when that scope is next successfully rediscovered.
 - Only regular UTF-8 files up to 64 KiB are accepted, with fatal decoding and bounded
   reads. BOM and line endings are normalized. Outside-cwd symlinks are rejected.
-- The registry is memory-only. Instruction text is not added to UI, logs, tool
-  results, or session entries. Warnings contain fixed reasons, never file contents,
+- The registry is memory-only. Instruction text is appended to tool results and
+  therefore saved in the session file; it is not added to UI or logs. Warnings contain fixed reasons, never file contents,
   absolute paths, or raw exceptions. Defaults are constants in `config.ts`.
 - Nested codemode `read`/`edit`/`write` calls use the same hooks in pi 1.4.0.
-  Bash, grep, find, ls, powershell, tool_search, and other tool names are ignored.
+  Their results reach only the calling tool, so the reminder is appended to the
+  calling tool's own result instead. Bash, grep, find, ls, powershell, tool_search,
+  and other tool names do not trigger discovery.
 
 ## Limits
 
 Instructions affect the **next** inference, not the reasoning that chose the
-current tool call. Scopes are model guidance, not enforced isolation or a sandbox.
+current tool call. Each instruction is sent once per content version (mtime and size);
+a changed file is sent again, but a deleted one stays in earlier history. Scopes are model guidance, not enforced isolation or a sandbox.
 Instructions go to the model provider, and the model or other extensions may expose
 them. Explicitly reading `AGENTS.md` is still an ordinary read whose output pi can
 save; this extension does not redact normal file operations.
 
-State survives compaction within the same runtime, but starts empty on process
-restart, session replacement, or extension reload. History is not replayed on
-`--continue`; the next eligible file access repopulates the registry. Metadata-only
+State survives compaction within the same runtime, and the next tool result after
+compaction resends every loaded instruction. State starts empty on process restart,
+session replacement, or extension reload. On `--continue`, the next eligible file
+access sends the instructions again even if earlier history already has them. Metadata-only
 caching cannot detect same-size edits with unchanged mtime. There is no total
 instruction-token budget and no support for other instruction filenames.
 
@@ -107,13 +113,13 @@ only erasable TypeScript syntax.
 
 Tests use Node's native TypeScript stripping and temporary runtime fixtures, with
 no additional test runner. They cover discovery, caching, hooks, parallel/nested
-calls, context ordering, lifecycle, and security failures.
+calls, reminder deduplication, lifecycle, and security failures.
 
-Real-pi smoke tests verified direct and nested codemode reads, canary compliance
-after the tool result, `--continue`, root non-duplication, and no descendant
-instruction text in stdout/stderr or session JSONL. Offline checks of pi 1.4.0's
-ten API serializers preserved tool-call/result references and placed one reminder
-after results; live provider verification was limited to OpenAI.
+A real-pi smoke test (pi 1.4.0, OpenAI, six sequential reads under `sub/`) verified
+canary compliance, exactly one reminder in the session JSONL, and cached input
+growing on every request (18.2k to 35.8k tokens), where the previous request-local
+`context` injection stayed at 18.2k. Nested codemode reads have not been re-verified
+against a live provider since that change.
 
 API references: pi's `extensions.md`, `message-types.md`, `codemode.md`, `cli.md`,
 `packages.md`, `compaction.md`, `session-format.md`, and `configuration.md`.
