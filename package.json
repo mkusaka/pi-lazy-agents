@@ -1,6 +1,6 @@
 {
   "name": "pi-lazy-agents",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Load descendant AGENTS.md files and .agents/skills into pi tool results on file access.",
   "type": "module",
   "license": "MIT",
